@@ -19,12 +19,22 @@
 
 #define DEFAULT_STACK_SIZE 2048
 #define CDC_ITF_TX      1
+#define BUFFER_SIZE 1000
+#define message[BUFFER_SIZE]
+float position_data[7];
 
 
 // Tehtävä 3: Tilakoneen esittely Add missing states.
 // Exercise 3: Definition of the state machine. Add missing states.
 enum state { WAITING=1,
-             DATA_READY};
+             DATA_READY,
+             READ_BUTTON,
+             READ_POS,
+             ADD_CHAR,
+             SEND_MSG,
+             CHK_MSG,
+             ADD_SPACE
+             };
 enum state programState = WAITING;
 
 // Tehtävä 3: Valoisuuden globaali muuttuja
@@ -83,6 +93,43 @@ static void sensor_task(void *arg){
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+
+static void read_position(void *arg){
+    (void)arg;
+
+    init_ICM42670();
+
+    float ax; float ay; float az;
+    float gx; float gy; float gz;
+    float t;
+
+    for(;;){
+        
+
+        //if (programState == READ_POS){
+            ICM42670_read_sensor_data(&ax, &ay, &az, 
+                                  &gx, &gy, &gz,
+                                  &t);
+            printf("%f", ax);
+                                  
+            float temp_data[] = {ax, ay, az, gx, gy, gz, t};
+            for(int i=0;i< 7; i++){
+                position_data[i] = temp_data[i];
+            }
+                
+            
+            programState = DATA_READY;
+        //}
+        for(int i=0;i<7;i++){
+            printf("%f, ", position_data[i]);
+
+        }
+        printf("\n");
+        
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 
 static void print_task(void *arg){
     (void)arg;
@@ -145,6 +192,7 @@ static void usbTask(void *arg) {
     }
 }*/
 
+
 int main() {
 
     // Exercise 4: Comment the statement stdio_init_all(); 
@@ -186,13 +234,25 @@ int main() {
 
     
     
-    TaskHandle_t hSensorTask, hPrintTask, hUSB = NULL;
+    TaskHandle_t hreadPosition, hSensorTask, hPrintTask, hUSB = NULL;
 
     // Exercise 4: Uncomment this xTaskCreate to create the task that enables dual USB communication.
     // Tehtävä 4: Poista tämän xTaskCreate-rivin kommentointi luodaksesi tehtävän,
     // joka mahdollistaa kaksikanavaisen USB-viestinnän.
 
     /*
+    result = xTaskCreate(print_task,  // (en) Task function
+                "print",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hPrintTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("Print Task creation failed\n");
+        return 0;
+    }
     xTaskCreate(usbTask, "usb", 2048, NULL, 3, &hUSB);
     #if (configNUMBER_OF_CORES > 1)
         vTaskCoreAffinitySet(hUSB, 1u << 0);
@@ -218,7 +278,21 @@ int main() {
                 NULL,                 // (en) Arguments of the task 
                 2,                    // (en) Priority of this task
                 &hPrintTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("Print Task creation failed\n");
+        return 0;
+    }
 
+    result = xTaskCreate(read_position,  // (en) Task function
+                "read",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hreadPosition);         // (en) A handle to control the execution of this task
+    
+                
     if(result != pdPASS) {
         printf("Print Task creation failed\n");
         return 0;
