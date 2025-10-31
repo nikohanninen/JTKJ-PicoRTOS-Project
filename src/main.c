@@ -98,6 +98,7 @@ static void read_position(void *arg){
     (void)arg;
 
     init_ICM42670();
+    ICM42670_start_with_default_values();
 
     float ax; float ay; float az;
     float gx; float gy; float gz;
@@ -110,7 +111,7 @@ static void read_position(void *arg){
             ICM42670_read_sensor_data(&ax, &ay, &az, 
                                   &gx, &gy, &gz,
                                   &t);
-            printf("%f", ax);
+            
                                   
             float temp_data[] = {ax, ay, az, gx, gy, gz, t};
             for(int i=0;i< 7; i++){
