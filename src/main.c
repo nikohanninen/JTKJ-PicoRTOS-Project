@@ -7,7 +7,7 @@
 #include <FreeRTOS.h>
 #include <queue.h>
 #include <task.h>
-
+#include <math.h>
 //#include <pins.h>
 
 #include "tkjhat/sdk.h"
@@ -121,13 +121,19 @@ static void read_position(void *arg){
             
             programState = DATA_READY;
         //}
-        for(int i=0;i<7;i++){
-            printf("%f, ", position_data[i]);
+        //for(int i=0;i<6;i++){
+            //printf("%.02f, ", position_data[i]);
+            if(fabs(position_data[1]) < 0.6){
+                printf("vaaka");
+            }
+            else{
+                printf("pysty");
+            }
 
-        }
+        //}
         printf("\n");
         
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -144,10 +150,12 @@ static void print_task(void *arg){
         //             Remember to modify state
         //             Do not forget to comment next line of code.
         //tight_loop_contents();
+        /*
         if (programState == DATA_READY){
             printf("%d\n", ambientLight);
             programState = WAITING;
         }
+            */
         
 
 
