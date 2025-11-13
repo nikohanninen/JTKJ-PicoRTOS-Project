@@ -29,13 +29,11 @@ float position_data[7];
 // Tehtävä 3: Tilakoneen esittely Add missing states.
 // Exercise 3: Definition of the state machine. Add missing states.
 enum state { WAITING=1,
-             DATA_READY,
-             READ_BUTTON,
              READ_POS,
              ADD_CHAR,
-             SEND_MSG,
-             CHK_MSG,
-             ADD_SPACE
+             ADD_SPACE,
+             CHECK_READY,
+             SEND
              };
 enum state programState = WAITING;
 
@@ -322,7 +320,7 @@ int main() {
 
     
     
-    TaskHandle_t hreadPosition, hSensorTask, hPrintTask, hUSB = NULL;
+    TaskHandle_t hreadPosition, hSensorTask, hPrintTask, hUSB, hCharAddTask, hSpaceAddTask, hCheckReadyTask, hSendTask = NULL;
 
     // Exercise 4: Uncomment this xTaskCreate to create the task that enables dual USB communication.
     // Tehtävä 4: Poista tämän xTaskCreate-rivin kommentointi luodaksesi tehtävän,
@@ -370,6 +368,58 @@ int main() {
                 
     if(result != pdPASS) {
         printf("Print Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(char_add_task,  // (en) Task function
+                "char_add",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hCharAddTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("char_add Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(space_add_task,  // (en) Task function
+                "space_add",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hSpaceAddTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("space_add Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(check_ready_task,  // (en) Task function
+                "check_ready",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hCheckReadyTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("check_ready Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(send_task,  // (en) Task function
+                "send",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hSendTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("send Task creation failed\n");
         return 0;
     }
 
