@@ -20,7 +20,9 @@
 #define DEFAULT_STACK_SIZE 2048
 #define CDC_ITF_TX      1
 #define BUFFER_SIZE 1000
-#define message[BUFFER_SIZE]
+string[BUFFER_SIZE] message;
+char last_char;
+uint16_t message_length = 0;
 float position_data[7];
 
 
@@ -41,7 +43,8 @@ enum state programState = WAITING;
 // Exercise 3: Global variable for ambient light
 uint32_t ambientLight;
 
-static void btn_fxn(uint gpio, uint32_t eventMask) {
+static void read_btn_fxn(uint gpio, uint32_t eventMask) {
+    /*
     // Tehtävä 1: Vaihda LEDin tila.
     //            Tarkista SDK, ja jos et löydä vastaavaa funktiota, sinun täytyy toteuttaa se itse.
     // Exercise 1: Toggle the LED. 
@@ -49,6 +52,23 @@ static void btn_fxn(uint gpio, uint32_t eventMask) {
     uint8_t pinValue = gpio_get(LED1);
     pinValue = !pinValue;
     gpio_put(LED1, pinValue);
+    */
+
+    programState = READ_POS;
+}
+
+static void space_btn_fxn(uint gpio, uint32_t eventMask) {
+    /*
+    // Tehtävä 1: Vaihda LEDin tila.
+    //            Tarkista SDK, ja jos et löydä vastaavaa funktiota, sinun täytyy toteuttaa se itse.
+    // Exercise 1: Toggle the LED. 
+    //             Check the SDK and if you do not find a function you would need to implement it yourself. 
+    uint8_t pinValue = gpio_get(LED1);
+    pinValue = !pinValue;
+    gpio_put(LED1, pinValue);
+    */
+
+    programState = ADD_SPACE;
 }
 
 static void sensor_task(void *arg){
@@ -59,6 +79,7 @@ static void sensor_task(void *arg){
 
     for(;;){
         
+        /*
         // Tehtävä 2: Muokkaa tästä eteenpäin sovelluskoodilla. Kommentoi seuraava rivi.
         //             
         // Exercise 2: Modify with application code here. Comment following line.
@@ -90,6 +111,7 @@ static void sensor_task(void *arg){
         //printf("sensorTask\n");
 
         // Do not remove this
+        */
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -107,31 +129,27 @@ static void read_position(void *arg){
     for(;;){
         
 
-        //if (programState == READ_POS){
+        if (programState == READ_POS){
             ICM42670_read_sensor_data(&ax, &ay, &az, 
                                   &gx, &gy, &gz,
                                   &t);
             
-                                  
-            float temp_data[] = {ax, ay, az, gx, gy, gz, t};
-            for(int i=0;i< 7; i++){
-                position_data[i] = temp_data[i];
-            }
-                
             
-            programState = DATA_READY;
-        //}
-        //for(int i=0;i<6;i++){
-            //printf("%.02f, ", position_data[i]);
-            if(fabs(position_data[1]) < 0.6){
+
+            if(fabs(ay) < 0.6){
+                last_char = '-';
                 printf("vaaka");
             }
             else{
+                last_char = '.';
                 printf("pysty");
             }
 
-        //}
-        printf("\n");
+            printf("\n");
+                
+            
+            programState = ADD_CHAR;
+        }
         
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -188,6 +206,63 @@ static void print_task(void *arg){
     }
 }
 
+static void char_add_task(void *arg){
+    (void)arg;
+
+    while(1){
+
+        if programState == ADD_CHAR{
+            message[message_length] = last_char;
+
+            programState = WAITING;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+
+static void space_add_task(void *arg){
+    (void)arg;
+
+    while(1){
+        
+        if programState == ADD_SPACE{
+            message[message_length] = ' ';
+            message_length -= 1;
+
+            programState = CHECK_READY;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+static void check_ready_task(void *arg){
+    (void)arg;
+
+    while (1){
+
+        if programState == CHECK_READY{
+            if (message[message_length - 1] == ' ' && message[message_length - 2] == ' ' && message[message_length - 3] == ' '){
+                programState == SEND;
+            }
+            else{
+                programState == WAITING;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
+}
+
+static void send_task(void *arg){
+    (void)arg;
+
+    //TBD
+}
+
 
 // Exercise 4: Uncomment the following line to activate the TinyUSB library.  
 // Tehtävä 4:  Poista seuraavan rivin kommentointi aktivoidaksesi TinyUSB-kirjaston. 
@@ -228,10 +303,14 @@ int main() {
     gpio_init(BUTTON1);
     gpio_set_dir(BUTTON1, GPIO_IN);
 
+    gpio_init(BUTTON2);
+    gpio_set_dir(BUTTON2, GPIO_IN);
+
     gpio_init(LED1);
     gpio_set_dir(LED1, GPIO_OUT);
 
-    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, read_btn_fxn);
+    gpio_set_irq_enabled_with_callback(BUTTON2, GPIO_IRQ_EDGE_RISE, true, space_btn_fxn);
 
 
     // Exercise 1: Initialize the button and the led and define an register the corresponding interrupton.
