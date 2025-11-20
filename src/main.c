@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 
@@ -20,20 +19,20 @@
 #define DEFAULT_STACK_SIZE 2048
 #define CDC_ITF_TX      1
 #define BUFFER_SIZE 1000
-#define message[BUFFER_SIZE]
+char message[BUFFER_SIZE];
+char last_char;
+uint16_t message_length = 0;
 float position_data[7];
 
 
 // Tehtävä 3: Tilakoneen esittely Add missing states.
 // Exercise 3: Definition of the state machine. Add missing states.
 enum state { WAITING=1,
-             DATA_READY,
-             READ_BUTTON,
              READ_POS,
              ADD_CHAR,
-             SEND_MSG,
-             CHK_MSG,
-             ADD_SPACE
+             ADD_SPACE,
+             CHECK_READY,
+             SEND
              };
 enum state programState = WAITING;
 
@@ -42,6 +41,7 @@ enum state programState = WAITING;
 uint32_t ambientLight;
 
 static void btn_fxn(uint gpio, uint32_t eventMask) {
+    /*
     // Tehtävä 1: Vaihda LEDin tila.
     //            Tarkista SDK, ja jos et löydä vastaavaa funktiota, sinun täytyy toteuttaa se itse.
     // Exercise 1: Toggle the LED. 
@@ -49,89 +49,51 @@ static void btn_fxn(uint gpio, uint32_t eventMask) {
     uint8_t pinValue = gpio_get(LED1);
     pinValue = !pinValue;
     gpio_put(LED1, pinValue);
-}
-
-static void sensor_task(void *arg){
-    (void)arg;
-    // Tehtävä 2: Alusta valoisuusanturi. Etsi SDK-dokumentaatiosta sopiva funktio.
-    // Exercise 2: Init the light sensor. Find in the SDK documentation the adequate function.
-    init_veml6030();
-
-    for(;;){
-        
-        // Tehtävä 2: Muokkaa tästä eteenpäin sovelluskoodilla. Kommentoi seuraava rivi.
-        //             
-        // Exercise 2: Modify with application code here. Comment following line.
-        //             Read sensor data and print it out as string; 
-        //tight_loop_contents(); 
-
-        if (programState == WAITING){
-            ambientLight = veml6030_read_light();
-            programState = DATA_READY;
-        }
-   
-
-
-        // Tehtävä 3:  Muokkaa aiemmin Tehtävässä 2 tehtyä koodia ylempänä.
-        //             Jos olet oikeassa tilassa, tallenna anturin arvo tulostamisen sijaan
-        //             globaaliin muuttujaan.
-        //             Sen jälkeen muuta tilaa.
-        // Exercise 3: Modify previous code done for Exercise 2, in previous lines. 
-        //             If you are in adequate state, instead of printing save the sensor value 
-        //             into the global variable.
-        //             After that, modify state
-
-
-
-
-        
-        // Exercise 2. Just for sanity check. Please, comment this out
-        // Tehtävä 2: Just for sanity check. Please, comment this out
-        //printf("sensorTask\n");
-
-        // Do not remove this
-        vTaskDelay(pdMS_TO_TICKS(1000));
+    */
+    if (gpio == BUTTON1 && programState == WAITING){
+        programState = READ_POS;
+    }
+    else if (gpio == BUTTON2 && programState == WAITING){
+        programState = ADD_SPACE;
     }
 }
+
+
+
 
 static void read_position(void *arg){
     (void)arg;
 
-    init_ICM42670();
+    
     ICM42670_start_with_default_values();
 
     float ax; float ay; float az;
     float gx; float gy; float gz;
     float t;
 
-    for(;;){
+    while(1){
         
 
-        //if (programState == READ_POS){
+        if (programState == READ_POS){
             ICM42670_read_sensor_data(&ax, &ay, &az, 
                                   &gx, &gy, &gz,
                                   &t);
             
-                                  
-            float temp_data[] = {ax, ay, az, gx, gy, gz, t};
-            for(int i=0;i< 7; i++){
-                position_data[i] = temp_data[i];
-            }
-                
             
-            programState = DATA_READY;
-        //}
-        //for(int i=0;i<6;i++){
-            //printf("%.02f, ", position_data[i]);
-            if(fabs(position_data[1]) < 0.6){
-                printf("vaaka");
+
+            if(fabs(ay) < 0.6){
+                last_char = '-';
+                printf("-");
             }
             else{
-                printf("pysty");
+                last_char = '.';
+                printf(".");
             }
 
-        //}
-        printf("\n");
+                
+            
+            programState = ADD_CHAR;
+        }
         
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -141,7 +103,9 @@ static void read_position(void *arg){
 static void print_task(void *arg){
     (void)arg;
     
+    
     while(1){
+
         
         // Tehtävä 3: Kun tila on oikea, tulosta sensoridata merkkijonossa debug-ikkunaan
         //            Muista tilamuutos
@@ -184,7 +148,73 @@ static void print_task(void *arg){
         //printf("printTask\n");
         
         // Do not remove this
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+static void char_add_task(void *arg){
+    (void)arg;
+
+    while(1){
+
+        if (programState == ADD_CHAR){
+            message[message_length] = last_char;
+            message_length++;
+
+            programState = WAITING;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+
+static void space_add_task(void *arg){
+    (void)arg;
+
+    while(1){
+        
+        if (programState == ADD_SPACE){
+            message[message_length] = ' ';
+            message_length += 1;
+
+            programState = CHECK_READY;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+static void check_ready_task(void *arg){
+    (void)arg;
+
+    while (1){
+
+        if (programState == CHECK_READY){
+            if (message[message_length - 1] == ' ' && message[message_length - 2] == ' ' && message[message_length - 3] == ' '){
+                programState = SEND;
+            }
+            else{
+                programState = WAITING;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+}
+
+static void send_task(void *arg){
+    (void)arg;
+
+    while(1){
+        if (programState == SEND){
+            printf("Message: %s\n", message);
+            memset(message, 0, BUFFER_SIZE);
+            message_length = 0;
+            programState = WAITING;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -216,6 +246,7 @@ int main() {
     //             Poista CMakeLists.txt-tiedostosta käytöstä pico_enable_stdio_usb
 
     stdio_init_all();
+    
 
     // Uncomment this lines if you want to wait till the serial monitor is connected
     /*while (!stdio_usb_connected()){
@@ -224,14 +255,20 @@ int main() {
     
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
+    init_ICM42670();
+    init_veml6030();
 
     gpio_init(BUTTON1);
     gpio_set_dir(BUTTON1, GPIO_IN);
+
+    gpio_init(BUTTON2);
+    gpio_set_dir(BUTTON2, GPIO_IN);
 
     gpio_init(LED1);
     gpio_set_dir(LED1, GPIO_OUT);
 
     gpio_set_irq_enabled_with_callback(BUTTON1, GPIO_IRQ_EDGE_RISE, true, btn_fxn);
+    gpio_set_irq_enabled(BUTTON2, GPIO_IRQ_EDGE_RISE, true);
 
 
     // Exercise 1: Initialize the button and the led and define an register the corresponding interrupton.
@@ -243,7 +280,7 @@ int main() {
 
     
     
-    TaskHandle_t hreadPosition, hSensorTask, hPrintTask, hUSB = NULL;
+    TaskHandle_t hreadPosition, hPrintTask, hUSB, hCharAddTask, hSpaceAddTask, hCheckReadyTask, hSendTask = NULL;
 
     // Exercise 4: Uncomment this xTaskCreate to create the task that enables dual USB communication.
     // Tehtävä 4: Poista tämän xTaskCreate-rivin kommentointi luodaksesi tehtävän,
@@ -270,18 +307,8 @@ int main() {
 
 
     // Create the tasks with xTaskCreate
-    BaseType_t result = xTaskCreate(sensor_task, // (en) Task function
-                "sensor",                        // (en) Name of the task 
-                DEFAULT_STACK_SIZE,              // (en) Size of the stack for this task (in words). Generally 1024 or 2048
-                NULL,                            // (en) Arguments of the task 
-                2,                               // (en) Priority of this task
-                &hSensorTask);                   // (en) A handle to control the execution of this task
-
-    if(result != pdPASS) {
-        printf("Sensor task creation failed\n");
-        return 0;
-    }
-    result = xTaskCreate(print_task,  // (en) Task function
+    
+    BaseType_t result = xTaskCreate(print_task,  // (en) Task function
                 "print",              // (en) Name of the task 
                 DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
                 NULL,                 // (en) Arguments of the task 
@@ -291,6 +318,58 @@ int main() {
                 
     if(result != pdPASS) {
         printf("Print Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(char_add_task,  // (en) Task function
+                "char_add",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hCharAddTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("char_add Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(space_add_task,  // (en) Task function
+                "space_add",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hSpaceAddTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("space_add Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(check_ready_task,  // (en) Task function
+                "check_ready",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hCheckReadyTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("check_ready Task creation failed\n");
+        return 0;
+    }
+
+    result = xTaskCreate(send_task,  // (en) Task function
+                "send",              // (en) Name of the task 
+                DEFAULT_STACK_SIZE,   // (en) Size of the stack for this task (in words). Generally 1024 or 2048
+                NULL,                 // (en) Arguments of the task 
+                2,                    // (en) Priority of this task
+                &hSendTask);         // (en) A handle to control the execution of this task
+    
+                
+    if(result != pdPASS) {
+        printf("send Task creation failed\n");
         return 0;
     }
 
@@ -313,4 +392,3 @@ int main() {
     // Never reach this line.
     return 0;
 }
-
