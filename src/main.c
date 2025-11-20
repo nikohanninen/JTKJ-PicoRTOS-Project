@@ -16,8 +16,8 @@
 #define DEFAULT_STACK_SIZE 2048
 #define CDC_ITF_TX      1
 #define BUFFER_SIZE 1000
-char message[BUFFER_SIZE];
-char last_char;
+char message[BUFFER_SIZE]; //message to send
+char last_char; //character to add to the message
 uint16_t message_length = 0;
 float position_data[7];
 
@@ -31,6 +31,7 @@ enum state { WAITING=1,
              };
 enum state programState = WAITING;
 
+//Button control. Changes programState to READ_POS or ADD_SPACE depending on which button is pressed 
 static void btn_fxn(uint gpio, uint32_t eventMask) {
     if (gpio == BUTTON1 && programState == WAITING){
         programState = READ_POS;
@@ -39,7 +40,7 @@ static void btn_fxn(uint gpio, uint32_t eventMask) {
         programState = ADD_SPACE;
     }
 }
-
+//reads the position of the device. Adds value '-' or '.' to last_char depending on the position of the device, then changes programState to ADD_CHAR
 static void read_position(void *arg){
     (void)arg;
 
@@ -78,7 +79,7 @@ static void read_position(void *arg){
 }
 
 
-
+//adds last_char to message. Changes state to WAITING
 static void char_add_task(void *arg){
     (void)arg;
 
@@ -95,7 +96,7 @@ static void char_add_task(void *arg){
     }
 }
 
-
+//Adds spaces to message. changes state to CHECK_READY
 static void space_add_task(void *arg){
     (void)arg;
 
@@ -103,7 +104,7 @@ static void space_add_task(void *arg){
         
         if (programState == ADD_SPACE){
             message[message_length] = ' ';
-            message_length += 1;
+            message_length ++;
             printf(" ");
 
             programState = CHECK_READY;
@@ -112,15 +113,17 @@ static void space_add_task(void *arg){
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
-
+//Checks if message has three spaces in a row. If true, changes state to SEND. Else changes it to WAITING
 static void check_ready_task(void *arg){
     (void)arg;
 
     while (1){
 
         if (programState == CHECK_READY){
-            if (message[message_length - 1] == ' ' && message[message_length - 2] == ' ' && message[message_length - 3] == ' '){
-                programState = SEND;
+            if(message_length >= 3){
+              if (message[message_length - 1] == ' ' && message[message_length - 2] == ' ' && message[message_length - 3] == ' '){ 
+                  programState = SEND;
+              }
             }
             else{
                 programState = WAITING;
@@ -131,7 +134,7 @@ static void check_ready_task(void *arg){
     }
 
 }
-
+//prints the written message, then resets the message variable, and changes state to WAITING
 static void send_task(void *arg){
     (void)arg;
 
@@ -159,7 +162,7 @@ int main() {
     init_hat_sdk();
     sleep_ms(300); //Wait some time so initialization of USB and hat is done.
     init_ICM42670();
-
+    
     gpio_init(BUTTON1);
     gpio_set_dir(BUTTON1, GPIO_IN);
 
