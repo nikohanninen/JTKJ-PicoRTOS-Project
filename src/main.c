@@ -177,6 +177,7 @@ static void space_add_task(void *arg){
         if (programState == ADD_SPACE){
             message[message_length] = ' ';
             message_length += 1;
+            printf("_");
 
             programState = CHECK_READY;
         }
@@ -209,7 +210,7 @@ static void send_task(void *arg){
 
     while(1){
         if (programState == SEND){
-            printf("Message: %s\n", message);
+            printf("\nMessage: %s\n", message);
             memset(message, 0, BUFFER_SIZE);
             message_length = 0;
             programState = WAITING;
