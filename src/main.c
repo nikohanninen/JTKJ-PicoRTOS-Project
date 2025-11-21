@@ -124,6 +124,9 @@ static void check_ready_task(void *arg){
               if (message[message_length - 1] == ' ' && message[message_length - 2] == ' ' && message[message_length - 3] == ' '){ 
                   programState = SEND;
               }
+              else{
+                programState = WAITING;
+              }
             }
             else{
                 programState = WAITING;
